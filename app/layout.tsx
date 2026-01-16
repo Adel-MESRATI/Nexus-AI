@@ -1,3 +1,5 @@
+
+import IntroVideo from "./IntroVideo";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -29,6 +31,10 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0a0a0a] text-zinc-100`}
         >
+          {/* 1. The Video Player goes here! */}
+          <IntroVideo /> 
+          
+          {/* 2. The rest of your app */}
           {children}
         </body>
       </html>
