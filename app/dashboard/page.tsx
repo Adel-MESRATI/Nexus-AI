@@ -1,456 +1,213 @@
 "use client";
 
-import { useState } from "react";
-import { UserButton } from "@clerk/nextjs";
-import { 
-  Image as ImageIcon, 
-  Download, 
-  Loader2, 
-  Sparkles,
-  LayoutGrid,
-  ChevronDown,
-  ChevronUp,
-  Settings,
-  Wand2
-} from "lucide-react";
-
-const ASPECT_RATIOS = [
-  { label: "Square (1:1)", value: "1:1" },
-  { label: "Portrait (2:3)", value: "2:3" },
-  { label: "Landscape (3:2)", value: "3:2" },
-  { label: "Wide (16:9)", value: "16:9" },
-];
-
-const PRO_STYLES = [
-  { 
-    label: "None", 
-    value: "none",
-    keywords: "",
-    description: "No style enhancement"
-  },
-  { 
-    label: "Cinematic", 
-    value: "cinematic",
-    keywords: "cinematic lighting, 8k, hyper-realistic, shot on IMAX, dramatic",
-    description: "Hollywood-grade visuals"
-  },
-  { 
-    label: "3D Render", 
-    value: "3d",
-    keywords: "Unreal Engine 5 render, 3D, octane render, ray tracing",
-    description: "Stunning 3D graphics"
-  },
-  { 
-    label: "Anime", 
-    value: "anime",
-    keywords: "anime style, studio ghibli, vibrant, detailed line art",
-    description: "Animated masterpiece"
-  },
-  { 
-    label: "Cyberpunk", 
-    value: "cyberpunk",
-    keywords: "neon lights, cyberpunk, futuristic, blade runner style",
-    description: "Futuristic noir"
-  },
-  { 
-    label: "Retro Game / Pixel Art", 
-    value: "pixel",
-    keywords: "pixel art, 8-bit, retro game style, low poly, vibrant colors",
-    description: "Nostalgic 8-bit vibes"
-  },
-  { 
-    label: "Claymation", 
-    value: "claymation",
-    keywords: "claymation, stop motion, plasticine, Aardman style",
-    description: "Stop-motion charm"
-  },
-];
-
-interface GeneratedImage {
-  id: string;
-  image: string;
-  prompt: string;
-  createdAt: number;
-}
+import { useState, useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
+import { Download, Layout, Sparkles, Wand2, History, Settings, Zap } from "lucide-react";
 
 export default function Dashboard() {
+  const { user } = useUser();
   const [prompt, setPrompt] = useState("");
-  const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [selectedStyle, setSelectedStyle] = useState("none");
+  const [loading, setLoading] = useState(false);
+  const [image, setImage] = useState<string | null>(null);
+  const [history, setHistory] = useState<string[]>([]);
+  const [style, setStyle] = useState("None");
   const [negativePrompt, setNegativePrompt] = useState("blurry, low quality, watermark, text, signature, ugly, deformed");
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [imageHistory, setImageHistory] = useState<GeneratedImage[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isEnhancing, setIsEnhancing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
-  const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      setError("Please enter a prompt");
-      return;
-    }
+  // Pro feature lock
+  const handleWandClick = () => {
+    alert("You've been added to the Nexus AI Pro waitlist! We will notify you when this feature launches.");
+  };
 
-    setIsGenerating(true);
-    setError(null);
-    setGeneratedImage(null);
-
+  const generateImage = async () => {
+    if (!prompt) return;
+    setLoading(true);
+    
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt, aspectRatio, negativePrompt, style: selectedStyle }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          prompt: `${prompt} ${style === "None" ? "" : style}`,
+          negative_prompt: negativePrompt
+        }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate image");
-      }
+      if (!response.ok) throw new Error("Generation failed");
 
-      const data = await response.json();
-      const newImage: GeneratedImage = {
-        id: Date.now().toString(),
-        image: data.image,
-        prompt: prompt,
-        createdAt: Date.now(),
-      };
-      setGeneratedImage(data.image);
-      setImageHistory(prev => [newImage, ...prev]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setImage(url);
+      setHistory([url, ...history]); // Add to history
+    } catch (error) {
+      console.error(error);
+      alert("Failed to generate image. Please try again.");
     } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleDownload = (imageBase64: string, filename?: string) => {
-    if (!imageBase64) return;
-
-    const link = document.createElement("a");
-    link.href = `data:image/png;base64,${imageBase64}`;
-    link.download = filename || `nexus-ai-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const downloadFromHistory = (image: GeneratedImage) => {
-    handleDownload(image.image, `nexus-ai-${image.id}.png`);
-  };
-
-  const handleEnhancePrompt = async () => {
-    if (!prompt.trim()) {
-      setError("Please enter a prompt to enhance");
-      return;
-    }
-
-    setIsEnhancing(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/enhance", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to enhance prompt");
-      }
-
-      const data = await response.json();
-      
-      // Typewriter effect for enhanced prompt
-      const enhancedText = data.enhancedPrompt || prompt;
-      const originalPrompt = prompt;
-      
-      if (enhancedText && enhancedText !== originalPrompt) {
-        // Clear first
-        setPrompt("");
-        
-        // Then type out the enhanced prompt with typing effect
-        let currentIndex = 0;
-        const typingInterval = setInterval(() => {
-          if (currentIndex <= enhancedText.length) {
-            setPrompt(enhancedText.slice(0, currentIndex));
-            currentIndex += 3; // Speed of typing
-          } else {
-            clearInterval(typingInterval);
-          }
-        }, 20);
-        
-        // Cleanup after a reasonable timeout
-        setTimeout(() => clearInterval(typingInterval), 10000);
-      } else {
-        setPrompt(enhancedText);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsEnhancing(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100">
-      <div className="flex h-screen">
-        {/* Sidebar */}
-        <aside className="w-64 bg-zinc-900/50 border-r border-zinc-800 p-6 flex flex-col">
-          <div className="flex items-center gap-2 mb-8">
-            <Sparkles className="w-6 h-6 text-cyan-400" />
-            <h2 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-              Nexus AI
-            </h2>
+    <div className="min-h-screen bg-black text-gray-100 flex flex-col md:flex-row">
+      
+      {/* SIDEBAR - Hidden on Mobile, Visible on Desktop */}
+      <aside className="w-full md:w-64 bg-gray-900 border-b md:border-r border-gray-800 p-6 flex flex-col gap-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
+            <Zap className="w-5 h-5 text-white" />
+          </div>
+          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
+            Nexus AI
+          </h1>
+        </div>
+
+        <div className="space-y-2">
+          <button className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 text-white rounded-xl border border-gray-700 hover:bg-gray-700 transition">
+            <Layout size={18} />
+            <span>Generator</span>
+          </button>
+          <button onClick={handleWandClick} className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-gray-800/50 rounded-xl transition">
+            <History size={18} />
+            <span>History</span>
+          </button>
+          <button onClick={handleWandClick} className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-gray-800/50 rounded-xl transition">
+            <Settings size={18} />
+            <span>Settings</span>
+          </button>
+        </div>
+
+        <div className="mt-auto pt-6 border-t border-gray-800">
+          <div className="flex items-center gap-3">
+            <img src={user?.imageUrl} alt="User" className="w-8 h-8 rounded-full" />
+            <div className="text-sm">
+              <p className="font-medium text-white">{user?.fullName}</p>
+              <p className="text-xs text-gray-500">Free Plan</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+        <div className="max-w-4xl mx-auto space-y-8">
+          
+          {/* Header */}
+          <div className="flex flex-col gap-2">
+            <h2 className="text-3xl font-bold text-white">Create Magic</h2>
+            <p className="text-gray-400">Turn your imagination into reality with Flux AI.</p>
           </div>
 
-          <nav className="flex-1">
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-800/50 text-cyan-400">
-              <LayoutGrid className="w-5 h-5" />
-              <span className="font-medium">Dashboard</span>
-            </div>
-          </nav>
-
-          <div className="mt-auto space-y-4">
-            <UserButton 
-              appearance={{
-                elements: {
-                  avatarBox: "w-10 h-10",
-                },
-              }}
-            />
-            <div className="text-xs text-zinc-500 text-center pt-2 border-t border-zinc-800 space-y-1">
-              <div>
-                Designed & Built by<br />
-                <span className="text-zinc-400">Adel Mesrati</span>
-              </div>
-              <div className="text-zinc-600 mt-2">
-                © 2024 Nexus AI. All Rights Reserved.
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col p-8 overflow-y-auto">
-          <div className="max-w-4xl mx-auto w-full space-y-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Image Generation</h1>
-              <p className="text-zinc-400">Create stunning images with AI</p>
+          {/* INPUT AREA */}
+          <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-4 md:p-6 space-y-4">
+            <div className="relative">
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe your image... (e.g. A cyberpunk cat in Tokyo)"
+                className="w-full h-32 bg-black/50 border border-gray-700 rounded-xl p-4 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:outline-none resize-none"
+              />
+              <button 
+                onClick={handleWandClick}
+                className="absolute bottom-4 right-4 p-2 bg-purple-500/20 hover:bg-purple-500/40 text-purple-400 rounded-lg transition"
+                title="Enhance Prompt (Pro)"
+              >
+                <Wand2 size={18} />
+              </button>
             </div>
 
-            {/* Input Section */}
-            <div className="space-y-6">
-              {/* Magic Style Selector */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
-                  <Wand2 className="w-4 h-4 text-cyan-400" />
-                  Magic Style Selector
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {PRO_STYLES.map((style) => (
-                    <button
-                      key={style.value}
-                      onClick={() => setSelectedStyle(style.value)}
-                      className={`relative p-4 rounded-lg border-2 transition-all duration-200 text-left group ${
-                        selectedStyle === style.value
-                          ? "border-cyan-500 bg-cyan-500/10 shadow-lg shadow-cyan-500/20"
-                          : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-900/70"
-                      }`}
-                    >
-                      <div className={`font-semibold mb-1 ${
-                        selectedStyle === style.value
-                          ? "text-cyan-400"
-                          : "text-zinc-300"
-                      }`}>
-                        {style.label}
-                      </div>
-                      <div className="text-xs text-zinc-500 line-clamp-2">
-                        {style.description}
-                      </div>
-                      {selectedStyle === style.value && (
-                        <div className="absolute top-2 right-2 w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-                {selectedStyle !== "none" && (
-                  <p className="mt-2 text-xs text-zinc-500 italic">
-                    Style: {PRO_STYLES.find(s => s.value === selectedStyle)?.keywords}
-                  </p>
-                )}
-              </div>
-
-              <div className="relative">
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Prompt
-                </label>
-                <div className="relative">
-                  <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Describe the image you want to generate..."
-                    className="w-full h-32 px-4 py-3 pr-12 bg-zinc-900/50 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
-                  />
-                  <button
-                    onClick={handleEnhancePrompt}
-                    disabled={isEnhancing || !prompt.trim()}
-                    className="absolute top-3 right-3 p-2 rounded-lg bg-gradient-to-br from-purple-500/20 to-purple-600/30 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 hover:border-purple-400/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 group"
-                    title="Enhance Prompt with AI"
-                  >
-                    {isEnhancing ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Wand2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Aspect Ratio
-                </label>
-                <select
-                  value={aspectRatio}
-                  onChange={(e) => setAspectRatio(e.target.value)}
-                  className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                >
-                  {ASPECT_RATIOS.map((ratio) => (
-                    <option key={ratio.value} value={ratio.value}>
-                      {ratio.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Advanced Settings */}
-              <div className="border border-zinc-800 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-cyan-400" />
-                    <span className="text-sm font-medium text-zinc-300">Advanced Settings</span>
-                  </div>
-                  {showAdvanced ? (
-                    <ChevronUp className="w-4 h-4 text-zinc-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-zinc-400" />
-                  )}
-                </button>
-                
-                {showAdvanced && (
-                  <div className="p-4 space-y-4 border-t border-zinc-800">
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-300 mb-2">
-                        Negative Prompt
-                      </label>
-                      <input
-                        type="text"
-                        value={negativePrompt}
-                        onChange={(e) => setNegativePrompt(e.target.value)}
-                        placeholder="blurry, low quality, watermark..."
-                        className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      />
-                      <p className="mt-2 text-xs text-zinc-500">
-                        Specify what you don't want in the image
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+            {/* CONTROLS - Stack on Mobile, Row on Desktop */}
+            <div className="flex flex-col md:flex-row gap-4">
+              <select 
+                value={style}
+                onChange={(e) => setStyle(e.target.value)}
+                className="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="None">No Style</option>
+                <option value=", cinematic lighting, 8k, hyper-realistic, dramatic">Cinematic</option>
+                <option value=", anime style, studio ghibli, vibrant">Anime</option>
+                <option value=", 3D render, unreal engine 5, octane render">3D Model</option>
+                <option value=", pixel art, 8-bit, retro game style">Pixel Art</option>
+              </select>
 
               <button
-                onClick={handleGenerate}
-                disabled={isGenerating || !prompt.trim()}
-                className="w-full px-6 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold rounded-lg hover:from-cyan-400 hover:to-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20"
+                onClick={() => setShowSettings(!showSettings)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-700 transition"
               >
-                {isGenerating ? (
+                <Settings size={18} />
+                <span className="md:hidden">Advanced</span>
+              </button>
+
+              <button
+                onClick={generateImage}
+                disabled={loading || !prompt}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-3 px-6 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Generating...
+                    <Sparkles className="animate-spin" /> Generating...
                   </>
                 ) : (
                   <>
-                    <ImageIcon className="w-5 h-5" />
-                    Generate Image
+                    <Sparkles /> Generate Image
                   </>
                 )}
               </button>
-
-              {error && (
-                <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-400">
-                  {error}
-                </div>
-              )}
             </div>
 
-            {/* Generated Image */}
-            {generatedImage && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold">Generated Image</h2>
-                  <button
-                    onClick={() => handleDownload(generatedImage)}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download
-                  </button>
-                </div>
-                <div className="relative rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900/50">
-                  <img
-                    src={`data:image/png;base64,${generatedImage}`}
-                    alt="Generated"
-                    className="w-full h-auto"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Recent Creations Gallery */}
-            {imageHistory.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Recent Creations</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {imageHistory.map((image) => (
-                    <div
-                      key={image.id}
-                      className="group relative rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900/50 hover:border-cyan-500/50 transition-all"
-                    >
-                      <img
-                        src={`data:image/png;base64,${image.image}`}
-                        alt={image.prompt}
-                        className="w-full h-48 object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="absolute bottom-0 left-0 right-0 p-4">
-                          <p className="text-xs text-zinc-300 mb-2 line-clamp-2">
-                            {image.prompt}
-                          </p>
-                          <button
-                            onClick={() => downloadFromHistory(image)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm transition-colors border border-cyan-500/30"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            Download
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            {/* Advanced Settings */}
+            {showSettings && (
+              <div className="pt-4 border-t border-gray-800 animate-in fade-in slide-in-from-top-2">
+                <label className="text-xs uppercase text-gray-500 font-bold tracking-wider mb-2 block">Negative Prompt</label>
+                <input 
+                  type="text" 
+                  value={negativePrompt}
+                  onChange={(e) => setNegativePrompt(e.target.value)}
+                  className="w-full bg-black/30 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300"
+                />
               </div>
             )}
           </div>
-        </main>
-      </div>
+
+          {/* RESULT AREA */}
+          {image && (
+            <div className="bg-gray-900 rounded-2xl p-2 border border-gray-800 shadow-2xl shadow-purple-900/20">
+              <img src={image} alt="Generated" className="w-full rounded-xl" />
+              <div className="flex justify-between items-center p-4">
+                <p className="text-sm text-gray-400">Generated with Nexus AI</p>
+                <a href={image} download="nexus-ai-generated.png" className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+                  <Download size={16} /> Download
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* HISTORY - Grid Fix for Mobile */}
+          {history.length > 0 && (
+            <div className="pt-8 border-t border-gray-800">
+              <h3 className="text-xl font-bold text-white mb-4">Recent Creations</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {history.map((img, i) => (
+                  <div key={i} className="group relative aspect-square rounded-xl overflow-hidden border border-gray-800 cursor-pointer">
+                    <img src={img} alt="History" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                      <a href={img} download className="text-white bg-black/50 p-2 rounded-full backdrop-blur-sm">
+                        <Download size={20} />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* FOOTER */}
+          <footer className="text-center text-gray-600 text-sm py-8">
+            <p>Designed & Built by Adel Mesrati</p>
+            <p className="text-xs mt-1">© 2024 Nexus AI. All Rights Reserved.</p>
+          </footer>
+
+        </div>
+      </main>
     </div>
   );
 }
