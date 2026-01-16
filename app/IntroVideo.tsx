@@ -25,7 +25,7 @@ export default function IntroVideo() {
         className="w-full h-full object-cover"
         onEnded={() => setShow(false)} // Hides automatically when video ends
       >
-       <source src="C:\Users\Adel\neurapix\public\intro.mp4" />
+       <source src="/intro.mp4" type="video/mp4" />
       </video>
       
       {/* Skip Button */}
