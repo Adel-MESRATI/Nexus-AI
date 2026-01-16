@@ -245,8 +245,8 @@ export default function Dashboard() {
           
           <div className="text-xs text-zinc-500 text-center pt-2 border-t border-zinc-800 space-y-1">
             <div>
-              Designed & Built by<br />
-              <span className="text-zinc-400">Adel Mesrati</span>
+              Powered by<br />
+              <span className="text-zinc-400">MTI DEVELOPER</span>
             </div>
             <div className="text-zinc-600 mt-2">
               © 2024 Nexus AI. All Rights Reserved.
