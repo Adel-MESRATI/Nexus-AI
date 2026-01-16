@@ -1,0 +1,13 @@
+# Query: Adel MEsrati
+# ContextLines: 1
+
+2 results - 1 file
+
+app\landing-client.tsx:
+  147                  The most powerful AI Image Generator, designed by{" "}
+  148:                 <span className="text-cyan-400 font-medium">MTI DEVELOPER</span>.
+  149                </motion.p>
+
+  248            © 2024 Nexus AI. Built by{" "}
+  249:           <span className="text-cyan-400">MTI DEVELOPER</span>.
+  250          </div>
