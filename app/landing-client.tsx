@@ -145,7 +145,7 @@ export default function LandingPageClient() {
                 className="text-xl md:text-2xl text-zinc-400 max-w-3xl mx-auto font-light"
               >
                 The most powerful AI Image Generator, designed by{" "}
-                <span className="text-cyan-400 font-medium">Adel Mesrati</span>.
+                <span className="text-cyan-400 font-medium">MTI DEVELOPER</span>.
               </motion.p>
             </motion.div>
 
@@ -246,7 +246,7 @@ export default function LandingPageClient() {
       >
         <div className="max-w-7xl mx-auto px-6 text-center text-zinc-500 text-sm">
           © 2024 Nexus AI. Built by{" "}
-          <span className="text-cyan-400">Adel Mesrati</span>.
+          <span className="text-cyan-400">MTI DEVELOPER</span>.
         </div>
       </motion.footer>
 
