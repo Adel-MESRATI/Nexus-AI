@@ -25,7 +25,7 @@ export default function IntroVideo() {
         className="w-full h-full object-cover"
         onEnded={() => setShow(false)} // Hides automatically when video ends
       >
-        <source src="/intro.mp4" type="video/mp4" />
+       <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4" />
       </video>
       
       {/* Skip Button */}
